@@ -14,6 +14,11 @@
  *
  */
  
+ //	Using this app will shorten the life of your air filter.  Depending on amount of people and pets in home a 3 month air filter could clog in 1 month.
+ //	Check you filter regularly until you have established a life span for them.  When the filter starts getting sucked in (center bowed in) it is pasted clogged.
+ // Recommend using a good 3 month filter.
+ 
+ 
  // Version 1.0 Feb 23 2019 mg
  
 definition(
