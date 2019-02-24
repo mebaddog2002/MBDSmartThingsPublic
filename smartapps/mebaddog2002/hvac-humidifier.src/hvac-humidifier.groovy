@@ -13,6 +13,12 @@
  *  for the specific language governing permissions and limitations under the License.
  *
  */
+ 
+ 
+ 
+ 
+ // This is a testing app for me.  Only use it in evaporator style.  Steam style has bugs.
+ 
 definition(
     name: "HVAC Humidifier",
     namespace: "mebaddog2002",
