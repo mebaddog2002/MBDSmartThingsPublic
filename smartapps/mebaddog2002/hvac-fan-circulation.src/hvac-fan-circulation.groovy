@@ -75,7 +75,7 @@ def initialize() {
 // TODO: implement event handlers
 
 def delayControlHandler(evt) {
-	log.debug "circControlHandler called: $evt"
+	log.debug "delayControlHandler called: $evt"
     
     def fanmode = thermostat.currentthermostatFanMode
     def tmode = thermostat.currentthermostatMode
