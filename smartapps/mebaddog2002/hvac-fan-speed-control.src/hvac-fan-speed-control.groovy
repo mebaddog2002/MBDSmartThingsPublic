@@ -85,7 +85,8 @@ preferences {
     	input "heatmin", "enum", title: "Heat Min Speed", options: ["Hi", "MedHi", "MedLow"], required: true, defaultValue:"MedHi"
         input "coolmin", "enum", title: "Cooling Min Speed", options: ["Hi", "MedHi", "MedLow"], required: true, defaultValue:"MedHi"
         input "fanmin", "enum", title: "Fan On Slow Speed", options: ["Hi", "MedHi", "MedLow", "Low"], required: true, defaultValue:"Low"
-    }            
+    }
+
 }
 
 def installed() {
@@ -102,34 +103,45 @@ def updated() {
 }
 
 def initialize() {
-	// TODO: subscribe to attributes, devices, locations, etc.
+	// internal variables
+    
+    atomicState.heatrunning = false
+    atomicState.coolrunning = false
+        
+
+// TODO: subscribe to attributes, devices, locations, etc.
     
     subscribe(thermostat, "thermostatFanMode", mainControlHandler)    
     subscribe(thermostat, "thermostatMode", mainControlHandler)    
     subscribe(thermostat, "thermostatOperatingState", mainControlHandler)
     subscribe(backpressure, "contact", mainControlHandler)
-    
+
     log.debug "Initialized"        
+
 }
+
 
 // TODO: implement event handlers
 
 def mainControlHandler(evt) {
 	log.debug "mainControlHandler called: $evt"
     
+    def fanmode = thermostat.currentthermostatFanMode
+    def tmode = thermostat.currentthermostatMode
+    def tstate = thermostat.currentthermostatOperatingState   
+    
 log.debug "TFan ${thermostat.currentthermostatFanMode}"
 log.debug "TMode ${thermostat.currentthermostatMode}"
 log.debug "TState ${thermostat.currentthermostatOperatingState}"
-log.debug "MedHi Relay ${medhirelay.currentswitchState}"
-log.debug "MedLow Relay ${medlowrelay.currentSwitchState}"
-log.debug "Low Relay ${lowrelay.currentSwitchState}"
+log.debug "MedHi Relay ${medhirelay.currentSwitch}"
+log.debug "MedLow Relay ${medlowrelay.currentSwitch}"
+log.debug "Low Relay ${lowrelay.currentSwitch}"
 log.debug "Back Pressure ${backpressure.currentContact}"
+log.debug "Heat Running ${atomicState.heatrunning}"
+log.debug "Cooling Running ${atomicState.coolrunning}"
     
-    def fanmode = thermostat.currentthermostatFanMode
-    def tmode = thermostat.currentthermostatMode
-    def tstate = thermostat.currentthermostatOperatingState
-    
-    if(tmode == "heat" && tstate == "idle" && fanmode == "fanAuto")
+
+    if(tmode == "heat" && ((tstate == "idle" && fanmode == "fanAuto") || (tstate == "heating" && fanmode == "fanOn")) && atomicState.heatrunning == false)
       {
       if(heatmin == "Hi")
         {
@@ -153,7 +165,7 @@ log.debug "Back Pressure ${backpressure.currentContact}"
         log.debug "Heat speed set to MedLow at idle"
         }        
       }
-    if(tmode == "cool" && tstate == "idle" && fanmode == "fanAuto")
+    if(tmode == "cool" && ((tstate == "idle" && fanmode == "fanAuto") || (tstate == "cooling" && fanmode == "fanOn")) && atomicState.coolrunning == false)
       {
       if(coolmin == "Hi")
         {
@@ -176,5 +188,73 @@ log.debug "Back Pressure ${backpressure.currentContact}"
         lowrelay.off()
         log.debug "Cool speed set to MedLow at idle"
         }        
+      }
+// delay after heat or cooling starts before speeding fan to high so vents have time to open     
+    if(tmode == "heat" && tstate == "heating" && atomicState.heatrunning == false)
+      {
+      runIn(60, heatstartedHandler)
+      atomicState.heatrunning = true
+      log.debug "Heat Started"
+      }
+    if(tmode == "cool" && tstate == "cooling" && atomicState.coolrunning == false)
+      {
+      runIn(60, coolstartedHandler)
+      atomicState.coolrunning = true
+      log.debug "Cooling Started"
+      }
+// delay after heat or cooling stops before speed is set to min 
+// this is because the fan stays running after going to idle      
+    if(tmode == "heat" && tstate == "idle" && atomicState.heatrunning == true)
+      {
+      runIn(120, heatstoppedHandler)
+      log.debug "Heat Stop timer started"
       }      
+      
+    if(tmode == "cool" && tstate == "idle" && atomicState.coolrunning == true)
+      {
+      runIn(120, coolstoppedHandler)
+      log.debug "Cooling Stop timer started"
+      }
+
+log.debug "DONE"      
 }    
+
+
+
+
+
+// TODO: implement handlers
+
+// speeding fan to high after heat or cool starts
+
+def heatstartedHandler() {
+	medhirelay.off()
+    medlowrelay.off()
+    lowrelay.off()
+    log.debug "Heat speed set to Hi after starting"
+}
+
+def coolstartedHandler() {
+	medhirelay.off()
+    medlowrelay.off()
+    lowrelay.off()
+    log.debug "Cool speed set to Hi after starting"
+
+}
+
+// now can let fan speed reset to min if still idle and fan is still auto
+def heatstoppedHandler() {
+	atomicState.heatrunning = false
+    execut(mainControlHandler)
+
+
+}
+
+def coolstoppedHandler() {
+	atomicState.coolrunning = false
+    subscribe (mainControlHandler)
+}
+
+
+
+
