@@ -18,13 +18,17 @@
 /**
  *	USE THIS APP AT YOUR OWN RISK.  MAJOR DAMAGE CAN OCCUR TO YOUR HVAC SYSTEM.
  *
- *	Most HVAC systems are oversized.  You should not hear the air coming out of your vents.  This is a sign of to much back pressure.
- *		When installing the HVAC they normally tap high speed to A/C and MedHi to heat and call it good.
+ *	This app will not work if using the AUTO mode.  This app does not work if using the thermostats CIRCULATE mode for the fan.  See my github for a fan circulate app.
  *
- *	If you never had it done it is a good idea to clean your A coil (do not remove) and remove and clean your fan.  You will need the wiring diagram off the side of 
- *		the motor to verify what color wire is what speed.  Make sure the fan is centered.  If the A coil or fan is nasty this will reduce air flow and will damage your system.
- *		If your return system is sealed properly and you use good air filters and change them out properly you will not have to clean your sytem every year.  Cleaning the outside A/C sytem now also
- *		before testing.  You do not want build up on the fins or bushes and flowers close to it.  You should be able to walk around it.
+ *	Most HVAC systems are oversized.  The air coming out of your vents should not whistle.  This is a sign of to much back pressure.
+ *		When installing the HVAC they normally tap high speed to A/C and MedHi to heat and call it good.  If you are using smart vents you
+ *		can build back pressure quickly.
+ *
+ *	If you never had it done it is a good idea to clean your A coil (do not remove) and remove and clean your fan.  If the return is on the fan side of your system you will have  
+ *		to remove the triangle plate on the A coil to clean it properly.  Do NOT damage or bend any of the tubes blocking it. You will need the wiring diagram off the side of the 
+ *		motor to verify what color wire is what speed.  Make sure the fan is centered.  If the A coil or fan is nasty this will reduce air flow and will damage your system.  
+ *		If your return system is sealed properly and you use good air filters and change them out properly you will not have to clean your sytem every year.  Clean the outside 
+ *      A/C sytem now also before testing.  You do not want build up on the fins or bushes and flowers close to it.  You should be able to walk around it.
  *
  *	You will have to test your system for the min speed for heating and cooling.  When testing lower/raise the thermostat temp so the heating/cooling stays on for 30 min to a hour.
  *		You need to run the system longer then when it runs on the hotest or coldest day.  But run it for atleast 30 min.
@@ -57,7 +61,7 @@ definition(
     name: "HVAC Fan Speed Control",
     namespace: "mebaddog2002",
     author: "Michael Goldsberry",
-    description: "This app will change the speed of the HVAC fan to reduce back pressure when using smart vents.  It does not control the vents.  It will also lower the fan speed when the fan is in the ON position after a set time.  It is designed to be used with a 4 speed fan.  You will need a pressure switch in the duct work for max back pressure.  You will have to test your system to determine min speed for heating and cooling. Read notes in code before installing.",
+    description: "This app will change the speed of the HVAC fan to reduce back pressure when using smart vents.  It does not control the vents.  This app does not work if using Auto.  This app does not work if using the built in circulate on the thermostat.  It will also lower the fan speed when the fan is in the ON position after a set time.  It is designed to be used with a 4 speed fan.  You will need a pressure switch in the duct work for max back pressure.  You will have to test your system to determine min speed for heating and cooling. Read notes in code before installing.",
     category: "My Apps",
     iconUrl: "https://s3.amazonaws.com/smartapp-icons/Convenience/Cat-Convenience.png",
     iconX2Url: "https://s3.amazonaws.com/smartapp-icons/Convenience/Cat-Convenience@2x.png",
@@ -67,7 +71,7 @@ definition(
 		// TODO: put inputs here
 preferences {
 	section("Title") {
-		paragraph "This app will change the speed of the HVAC fan to reduce back pressure when using smart vents.  It does not control the vents.  It will also lower the fan speed when the fan is in the ON position after a set time. You will have to test your system to determine min speed for heating and cooling. Read notes in code before installing."
+		paragraph "This app will change the speed of the HVAC fan to reduce back pressure when using smart vents.  It does not control the vents.  This app does not work if using Auto.  It will also lower the fan speed when the fan is in the ON position after a set time. You will have to test your system to determine min speed for heating and cooling. Read notes in code before installing."
 	}
     section("Thermostat") {
        input "thermostat", "capability.thermostat", required: true, title: "Select Thermostat"
@@ -107,7 +111,11 @@ def initialize() {
     
     atomicState.heatrunning = false
     atomicState.coolrunning = false
-        
+    atomicState.fanslowspeed = false
+    atomicState.fanhi = false
+    atomicState.fanmedhi = false
+    atomicState.fanmedlow = false
+    atomicState.fanlow = false
 
 // TODO: subscribe to attributes, devices, locations, etc.
     
@@ -115,6 +123,8 @@ def initialize() {
     subscribe(thermostat, "thermostatMode", mainControlHandler)    
     subscribe(thermostat, "thermostatOperatingState", mainControlHandler)
     subscribe(backpressure, "contact", mainControlHandler)
+    subscribe(thermostat, "thermostatFanMode", fanonControlHandler)
+    subscribe(thermostat, "thermostatOperatingState", fanonControlHandler)
 
     log.debug "Initialized"        
 
@@ -140,21 +150,23 @@ log.debug "Back Pressure ${backpressure.currentContact}"
 log.debug "Heat Running ${atomicState.heatrunning}"
 log.debug "Cooling Running ${atomicState.coolrunning}"
     
+// System is completely off.  Setting fan to heat or cool min for startup.
 
-    if(tmode == "heat" && ((tstate == "idle" && fanmode == "fanAuto") || (tstate == "heating" && fanmode == "fanOn")) && atomicState.heatrunning == false)
+    if(tmode == "heat" && tstate == "idle" && fanmode == "fanAuto" && atomicState.heatrunning == false)
       {
       if(heatmin == "Hi")
         {
-        medhirelay.off()
+        medhirelay.on()
         medlowrelay.off()
         lowrelay.off()
         log.debug "Heat speed set to Hi at idle"
         }
       if(heatmin == "MedHi")
-        {
+        {        
         medhirelay.on()
         medlowrelay.off()
         lowrelay.off()
+        
         log.debug "Heat speed set to MedHi at idle"
         }
       if(heatmin == "MedLow")
@@ -165,7 +177,7 @@ log.debug "Cooling Running ${atomicState.coolrunning}"
         log.debug "Heat speed set to MedLow at idle"
         }        
       }
-    if(tmode == "cool" && ((tstate == "idle" && fanmode == "fanAuto") || (tstate == "cooling" && fanmode == "fanOn")) && atomicState.coolrunning == false)
+    if(tmode == "cool" && tstate == "idle" && fanmode == "fanAuto" && atomicState.coolrunning == false)
       {
       if(coolmin == "Hi")
         {
@@ -189,15 +201,19 @@ log.debug "Cooling Running ${atomicState.coolrunning}"
         log.debug "Cool speed set to MedLow at idle"
         }        
       }
-// delay after heat or cooling starts before speeding fan to high so vents have time to open     
+      
+// delay after heat or cooling starts before speeding fan to high so vents have time to open  
+
     if(tmode == "heat" && tstate == "heating" && atomicState.heatrunning == false)
       {
+      fanonControlHandler()
       runIn(60, heatstartedHandler)
       atomicState.heatrunning = true
       log.debug "Heat Started"
       }
     if(tmode == "cool" && tstate == "cooling" && atomicState.coolrunning == false)
       {
+      fanonControlHandler()
       runIn(60, coolstartedHandler)
       atomicState.coolrunning = true
       log.debug "Cooling Started"
@@ -208,24 +224,55 @@ log.debug "Cooling Running ${atomicState.coolrunning}"
       {
       runIn(120, heatstoppedHandler)
       log.debug "Heat Stop timer started"
-      }      
+      }
+      else {
+      		unschedule(heatstoppedHandler)
+           }
       
     if(tmode == "cool" && tstate == "idle" && atomicState.coolrunning == true)
       {
       runIn(120, coolstoppedHandler)
       log.debug "Cooling Stop timer started"
       }
+      else {
+      		unschedule(coolstoppedHandler)
+           }
 
 log.debug "DONE"      
 }    
 
+// This handler controls the fan speed when the fan mode is ON and the thermostate is IDLE or OFF
 
+def fanonControlHandler(evt) {
+	log.debug "fanonControlHandler called: $evt"
+    
+    def fanmodefo = thermostat.currentthermostatFanMode
+    def tstatefo = thermostat.currentthermostatOperatingState  
+    
+    if(fanmodefo == "fanAuto")
+      {
+      atomicState.fanslowspeed = false
+      log.debug "Fan only slow speed cancelled"
+      
+      }
 
-
+    if(fanmodefo == "fanOn" && (tstatefo == "idle" || tstatefo == "off") && atomicState.coolrunning == false && atomicState.heatrunning == false && atomicState.fanslowspeed == false)
+      {
+  	  runIn(60, fanondelayHandler)
+      } 
+      else { 
+           unschedule(fanslowHandler)
+           unschedule(fanondelayHandler)
+           log.debug "Fan only timers cancelled"
+           }
+            
+        
+ 
+}
 
 // TODO: implement handlers
 
-// speeding fan to high after heat or cool starts
+// Setting fan to high after heat or cool starts
 
 def heatstartedHandler() {
 	medhirelay.off()
@@ -242,19 +289,62 @@ def coolstartedHandler() {
 
 }
 
-// now can let fan speed reset to min if still idle and fan is still auto
+// After timer finishes going to execute handelers again so fan can reset to what it was.
 def heatstoppedHandler() {
 	atomicState.heatrunning = false
-    execut(mainControlHandler)
-
-
+    mainControlHandler()
+    fanonControlHandler()
 }
 
 def coolstoppedHandler() {
 	atomicState.coolrunning = false
-    subscribe (mainControlHandler)
+    mainControlHandler()
+    fanonControlHandler()
+}
+
+// After timer finishes speeding up fan to HI in fan only and starting timer for slowed down
+
+def fanondelayHandler() {
+    medhirelay.off()
+    medlowrelay.off()
+    lowrelay.off()
+    runIn(delayfanon*60, fanslowHandler)
+    log.debug "Fan Only set to Hi speed"
 }
 
 
+// After timer finishes going to slow fan speed in fan only
 
+def fanslowHandler() {
+	atomicState.fanslowspeed = true
+    if(fanmin == "Hi")
+      {
+      medhirelay.off()
+      medlowrelay.off()
+      lowrelay.off()
+      log.debug "Fan Only speed set to Hi"
+      }
+    if(fanmin == "MedHi")
+      {
+      medhirelay.on()
+      medlowrelay.off()
+      lowrelay.off()
+      log.debug "Fan Only speed set to MedHi"
+      }
+    if(fanmin == "MedLow")
+      {
+      medhirelay.off()
+      medlowrelay.on()
+      lowrelay.off()
+      log.debug "Fan Only speed set to MedLow"
+      }
+    if(fanmin == "Low")
+      {
+      medhirelay.off()
+      medlowrelay.off()
+      lowrelay.on()
+      log.debug "Fan Only speed set to Low"
+      }          
+	
+}
 
