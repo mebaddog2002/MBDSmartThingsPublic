@@ -113,6 +113,7 @@ def initialize() {
     
     atomicState.heatrunning = false
     atomicState.coolrunning = false
+    atomicState.hvacstartfinished = false
     atomicState.fanslowspeed = false
 	atomicState.fanatslow = false
     atomicState.adjustingspeed = false
@@ -129,6 +130,8 @@ def initialize() {
     subscribe(backpressure, "contact", pressureControlHandler)
     subscribe(thermostat, "thermostatFanMode", fanonControlHandler)
     subscribe(thermostat, "thermostatOperatingState", fanonControlHandler)
+    
+//    subscribe(backpressure, "contact", mainControlHandler)
 
     log.debug "Initialized"        
 
@@ -142,14 +145,17 @@ def mainControlHandler(evt) {
     
     def fanmode = thermostat.currentthermostatFanMode
     def tmode = thermostat.currentthermostatMode
-    def tstate = thermostat.currentthermostatOperatingState   
+    def tstate = thermostat.currentthermostatOperatingState
+    def medhirelaystate = medhirelay.currentSwitch
+    def medlowrelaystate = medlowrelay.currentSwitch
+    def lowrelaystate = lowrelay.currentSwitch
     
 log.debug "TFan ${thermostat.currentthermostatFanMode}"
 log.debug "TMode ${thermostat.currentthermostatMode}"
 log.debug "TState ${thermostat.currentthermostatOperatingState}"
-//log.debug "MedHi Relay ${medhirelay.currentSwitch}"
-//log.debug "MedLow Relay ${medlowrelay.currentSwitch}"
-//log.debug "Low Relay ${lowrelay.currentSwitch}"
+log.debug "MedHi Relay ${medhirelay.currentSwitch}"
+log.debug "MedLow Relay ${medlowrelay.currentSwitch}"
+log.debug "Low Relay ${lowrelay.currentSwitch}"
 //log.debug "Back Pressure ${backpressure.currentContact}"
 log.debug "Heat Running ${atomicState.heatrunning}"
 log.debug "Cooling Running ${atomicState.coolrunning}"
@@ -164,9 +170,10 @@ log.debug "Cooling Running ${atomicState.coolrunning}"
         {
         if(heatmin == "Hi")
           {
-          if(medhirelay == "off" && medlowrelay == "off" && lowrelay == "off")
+          if(medhirelaystate == "off" && medlowrelaystate == "off" && lowrelaystate == "off")
             {
             atomicState.heatrunning = true
+            atomicState.hvacstartfinished = true
             log.debug "Heating start at Hi"
             } else {                 
                    runIn(60, hvacstarthiHandler)
@@ -174,32 +181,38 @@ log.debug "Cooling Running ${atomicState.coolrunning}"
           }         
         if(heatmin == "MedHi")
           {
-          if(medhirelay == "on")
+          if(medhirelaystate == "on" || (medhirelaystate == "off" && medlowrelaystate == "off" && lowrelaystate == "off"))
             {
             atomicState.heatrunning = true
-            log.debug "Heating start at MedHi"
+            atomicState.hvacstartfinished = true
+            pressureControlHandler()
+            log.debug "Heating start for MedHi"
             } else {
                    runIn(60, hvacstartmedhiHandler)
                    }
           }         
         if(heatmin == "MedLow")
           {
-          if(medlowrelay == "on")
+          if(medlowrelaystate == "on" || medhirelaystate == "on" || (medhirelaystate == "off" && medlowrelaystate == "off" && lowrelaystate == "off"))
             {
             atomicState.heatrunning = true
-            log.debug "Heating start at MedLow"
+            atomicState.hvacstartfinished = true
+            pressureControlHandler()
+            log.debug "Heating start for MedLow"
             } else {
                    runIn(60, hvacstartmedlowHandler)
                    }
-          }         
+          }        
         }
       if(tstate == "cooling")
         {
         if(coolmin == "Hi")
           {
-          if(medhirelay == "off" && medlowrelay == "off" && lowrelay == "off")
+          if(medhirelaystate == "off" && medlowrelaystate == "off" && lowrelaystate == "off")
             {
             atomicState.coolrunning = true
+            atomicState.hvacstartfinished = true
+            pressureControlHandler()
             log.debug "Coolinging start at Hi"
             } else {                 
                    runIn(60, hvacstarthiHandler)
@@ -207,9 +220,11 @@ log.debug "Cooling Running ${atomicState.coolrunning}"
           }         
         if(coolmin == "MedHi")
           {
-          if(medhirelay == "on")
+          if(medhirelaystate == "on" || (medhirelaystate == "off" && medlowrelaystate == "off" && lowrelaystate == "off"))
             {
             atomicState.coolrunning = true
+            atomicState.hvacstartfinished = true
+            pressureControlHandler()
             log.debug "Cooling start at MedHi"
             } else {
                    runIn(60, hvacstartmedhiHandler)
@@ -217,9 +232,11 @@ log.debug "Cooling Running ${atomicState.coolrunning}"
           }         
         if(coolmin == "MedLow")
           {
-          if(medlowrelay == "on")
+          if(medlowrelaystate == "on" || medhirelaystate == "on" || (medhirelaystate == "off" && medlowrelaystate == "off" && lowrelaystate == "off"))
             {
             atomicState.coolrunning = true
+            atomicState.hvacstartfinished = true
+            pressureControlHandler()
             log.debug "Cooling start at MedLow"
             } else {
                    runIn(60, hvacstartmedlowHandler)
@@ -319,13 +336,63 @@ def pressureControlHandler(evt) {
     def fanmodep = thermostat.currentthermostatFanMode
     def tstatep = thermostat.currentthermostatOperatingState 
     def pressure = backpressure.currentContact
+    def medhirelaystatep = medhirelay.currentSwitch
+    def medlowrelaystatep = medlowrelay.currentSwitch
+    def lowrelaystatep = lowrelay.currentSwitch    
  
  	log.debug "Back Pressure ${backpressure.currentContact}"
+    log.debug "Overpressure ${atomicState.overepressure}"
+    log.debug "Max Speed ${atomicState.maxspeed}"
+    log.debug "HVAC start finished ${atomicState.hvacstartfinished}"
+    log.debug "Adjusting Speed ${atomicState.adjustingspeed}"
+    
     
 //    atomicState.adjustingspeed = false
 //    atomicState.speedchanging = false
 //    atomicState.overepressure = false
 //    atomicState.maxspeed = false  
+//	  atomicState.hvacstartfinished = false
+
+	if(pressure == "closed")
+      {
+      atomicState.overepressure = true
+      atomicState.maxspeed = true
+      } else {
+             atomicState.overepressure = false
+             }
+             
+    if(pressure == "open" && fanmodep == "fanAuto" && tstatep == "idle")
+      {
+      atomicState.maxspeed = false
+      }
+
+	// Speeding fan up to max usable speed.  When the hvac starts some vents may close do to temp in that room so do not want to go straight to high speed and 
+    //		extremely over pressurize system
+
+	if(atomicState.hvacstartfinished == true && atomicState.adjustingspeed == false && atomicState.overepressure == false && atomicState.maxspeed == false)
+      {
+      atomicState.adjustingspeed = true
+      if(medhirelaystatep == "off" && medlowrelaystatep == "off" && lowrelaystatep == "off")
+        {
+        atomicState.maxspeed = true
+        atomicState.adjustingspeed = false
+        log.debug "Speed at max hi"
+        }
+      if(medhirelaystatep == "on")
+        {
+        medhirelay.off()
+        atomicState.maxspeed = true
+        atomicState.adjustingspeed = false
+        log.debug "Speed set to max hi"
+        }
+      if(medlowrelaystatep == "on")
+        {
+        medhirelay.on()
+        runIn(60, pressuremedhiupHandler)
+        }
+      
+      }
+      
     
     
 }    
@@ -339,6 +406,7 @@ def hvacstarthiHandler() {
 	medhirelay.off()
     medlowrelay.off()
     lowrelay.off()
+    atomicState.hvacstartfinished = true
     if(tstate == "heating")
       {
       atomicState.heatrunning = true
@@ -363,6 +431,8 @@ def hvacstartmedhiHandler() {
 def	hvacstartmedhi2Handler() {
     medlowrelay.off()
     lowrelay.off()
+    atomicState.hvacstartfinished = true
+    pressureControlHandler()
     log.debug "Heat/Cool speed set to MedHi after starting"
 }
 
@@ -381,6 +451,8 @@ def hvacstartmedlowHandler() {
 def	hvacstartmedlow2Handler() {
     medhirelay.off()
     lowrelay.off()
+    atomicState.hvacstartfinished = true
+    pressureControlHandler()
     log.debug "Heat/Cool speed set to MedLow after starting"
 }
 
@@ -389,7 +461,10 @@ def	hvacstartmedlow2Handler() {
 def hvacstopHandler() {
 	atomicState.heatrunning = false
     atomicState.coolrunning = false
+    atomicState.hvacstartfinished = false
+    atomicState.maxspeed = false
     fanonControlHandler()
+    
     log.debug "HVAC Stopped"
 }
 
@@ -440,3 +515,21 @@ def fanslowHandler() {
 	
 }
 
+//  Letting pressure stabelize after speed change before checking it again.
+
+def	pressuredelayHandler() {
+	atomicState.adjustingspeed = false
+	pressureControlHandler()
+}
+
+
+
+//  Finishing raising speed to MedHi
+
+def pressuremedhiupHandler() {
+	medlowrelay.off()
+    lowrelay.on()
+    atomicState.adjustingspeed = false
+    pressureControlHandler()
+    log.debug "Speed raised to MedHi"
+}
