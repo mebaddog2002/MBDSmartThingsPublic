@@ -55,10 +55,15 @@
  *	When the HVAC system starts in heating/cooling the fan will change to the min setting if its last speed was slower.  1 minute after it starts the fan will start speeding up 
  *		until the over pressure switch is made or at Hi speed.  The delay is so your smart vents can reset before the fan starts speeding up.
  *
- *	When installing the pressure switch do not connect the low pressure side of the switch to the return. This will give you differental pressure across the fan and A coil 
- *		and will give you a false back pressure reading.  Most bypass dampers start opening at .2wc/49.8pa are half open at .5wc/124.5pa and fully open at .8wc/199.2pa.
- *		You should never set the pressure switch above .8wc/199.2pa.  The lower pressure you can run the better it will be for your fan motor.  At the same time you shouldn't set it to low.
- *		If you are running smart vents make sure you have them also looking at the pressure switch.  They will fully open relieving the pressure while the fan is slowing to the next speed.
+ *	When installing the pressure switch you need to make sure you install the ports properly. On the return side put the port as close as possible to the fan.  Make sure this place includes 
+ *		air from all the returns in your house.  You may have to install it inside the furnace.  Make sure there is no filter between the port and the fan.  The port should be turned toward the fan.  
+ *		This will meassure the suction of the fan.  The supply side port can be placed in 2 places depending on how your system was designed for a proper reading to compare with
+ *		a fan chart for your system.  It will either go after the A coil or inbetween the heating element and the A coil.  The tip of the pressure port will point towards the fan.  When drilling 
+ *		either hole verify there is nothing behind where you are drilling.  Also do not place the ports on the edge of the duct work.  Try to center them as best as possible.  Sense bypass 
+ *		dampers are installed after the A coil this is where I installed my supply port.  Most bypass dampers start opening at .2wc/49.8pa are half open at .5wc/124.5pa and fully open at .8wc/199.2pa.
+ *		You should never set the pressure switch above .8wc/199.2pa if the supply port is installed after the A coil.  The lower pressure you can run the better it will be for your fan motor.  
+ *		At the same time you shouldn't set it to low.  If you are running smart vents make sure you have them also looking at the pressure switch.  They will fully open relieving the pressure 
+ *		while the fan is slowing to the next speed.
  *
  *
  *
