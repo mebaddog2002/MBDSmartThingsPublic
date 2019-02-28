@@ -18,7 +18,7 @@
 /**
  *	USE THIS APP AT YOUR OWN RISK.  MAJOR DAMAGE CAN OCCUR TO YOUR HVAC SYSTEM.
  *
- *	This app does not work if using the thermostats CIRCULATE mode for the fan.  See my github for a fan circulate app.
+ *	This app does not work if using the thermostats CIRCULATE mode for the fan.  See my github for a HVAC fan circulate app.
  *
  *	Most HVAC systems are oversized.  The air coming out of your vents should not whistle.  This is a sign of to much back pressure.
  *		When installing the HVAC they normally tap high speed to A/C and MedHi to heat and call it good.  If you are using smart vents you
@@ -32,13 +32,18 @@
  *
  *	You will have to test your system for the min speed for heating and cooling.  When testing lower/raise the thermostat temp so the heating/cooling stays on for 30 min to a hour.
  *		You need to run the system longer then when it runs on the hotest or coldest day.  But run it for atleast 30 min.
+ *	When checking to see how slow you can run your fan manually close down your smart vents like they normally would until you reach the max pressure you set the pressure switch.
+ *		Remember to listen to your vents for whistling.  You may find at the slower speed you need to set your vents min close to a sound level you like because the pressure switch didn't trip yet.
  *	Cooling make sure your A coil does not freeze when running at a slower speed.  The temp on the large line leaving the A coil must stay above
- *		freezing leaving your A coil or you can freeze the A coil and it will become a solid block of ice.
- *	Heating make sure you have enough air flow so the thermal overloads do not trip from getting to hot.  If they do you will notice that it 
- *		will blow hot air then cool then hot again.  This will cause them to fail if used to much.
+ *		freezing leaving your A coil or you can freeze the A coil and it will become a solid block of ice.  The air temp should be about 30 degrees different between the return and discharge.
+ *		With slowing the motor you may see more/less of a difference depending on your system and the return air temp and humidity.
+ *	Heating make sure you have enough air flow so the thermal overloads do not trip from getting to hot.  This is at about 200 degrees.  If they do you will notice that it 
+ *		will blow hot air then cool then hot again.  This will cause them to fail if used to much.  You can drill a small hole in the unit right above the heater and install a thermometer
+ *		to check air temp if you want.  Be sure NOTHING is inside the unit where you are drilling at.  Some units already have holes for getting temp readings.  Seal over hole when done.
+ *
  *	When you first turn the fan from Auto to On it will go to high speed after 1 minute.  After a time you set the fan will slow down to a speed you set when the fan mode is ON.  
  *		This is so during the cooler months you can run the fan constantly to circulate air through the house.  The fan doesn't need to be on high during this time.  
- *		If the heat/ac turns on during this time the fan will speed back up.
+ *		If the heat/cool turns on during this time the fan will speed back up.  After the heat/cool stops the fan will go back to its min speed.
  *
  *	Wire the relays in series for the fan speed.  You will need 3 relays.  You want only 1 speed wire to have power at a time when multi relays are on.  With all the relays OFF make this high speed.
  *		This is so if you loose power when it comes back on it will be on Hi speed until SmartThings starts controlling again.  When all the relays are ON make this MedHi speed.
@@ -47,11 +52,13 @@
  *		Then go from here to the MedHi relay.  From the MedHi relay NC contact go to the MedLow relay.  From the MedLow relay NC contact go to the Low relay.  On the Low relay NC
  *		contact connect the High speed wire.  On each relay connect the correct speed wire to each NO contact.
  *
- *	When the HVAC system is idle the fan speed is set to the min for the mode you are in (heat/cool).  When the heat/ac starts 1 minute later the fan will speed up to high.  This is incase you have smart vents.
- *		It gives your smart vents a chance to open before going into high speed and building to much back pressure.
+ *	When the HVAC system starts in heating/cooling the fan will change to the min setting if its last speed was slower.  1 minute after it starts the fan will start speeding up 
+ *		until the over pressure switch is made or at Hi speed.  The delay is so your smart vents can reset before the fan starts speeding up.
  *
  *	When installing the pressure switch do not connect the low pressure side of the switch to the return. This will give you differental pressure across the fan and A coil 
- *		and will give you a false back pressure reading.
+ *		and will give you a false back pressure reading.  Most bypass dampers start opening at .2wc/49.8pa are half open at .5wc/124.5pa and fully open at .8wc/199.2pa.
+ *		You should never set the pressure switch above .8wc/199.2pa.  The lower pressure you can run the better it will be for your fan motor.  At the same time you shouldn't set it to low.
+ *		If you are running smart vents make sure you have them also looking at the pressure switch.  They will fully open relieving the pressure while the fan is slowing to the next speed.
  *
  *
  *
@@ -151,9 +158,7 @@ log.debug "TState ${thermostat.currentthermostatOperatingState}"
 log.debug "MedHi Relay ${medhirelay.currentSwitch}"
 log.debug "MedLow Relay ${medlowrelay.currentSwitch}"
 log.debug "Low Relay ${lowrelay.currentSwitch}"
-log.debug "Heat Running ${atomicState.heatrunning}"
-log.debug "Cooling Running ${atomicState.coolrunning}"
-    
+log.debug "HVAC Running ${atomicState.hvacrunning}"    
     
     // delay after heat or cooling starts before speeding fan to min speed so vents have time to open  
 
@@ -330,6 +335,7 @@ def pressureControlHandler(evt) {
         {
         medhirelay.on()
         runIn(60, pressuremedhiupHandler)
+        log.debug "Speeding to MedHi"
         }
       
       }
