@@ -20,6 +20,7 @@
  
  
  // Version 1.0 Feb 23 2019 mg
+ // Version 2.0 Updated so it can be used in off mode.  Feb 28 2019 MG
  
 definition(
     name: "HVAC Fan Circulation",
@@ -41,6 +42,7 @@ preferences {
        input "thermostat", "capability.thermostat", required: true, title: "Select Thermostat"
        input "offdelaytime", "number", required: true, title: "Set time between circulation cycles (in minutes)", defaultValue:30
        input "fanontime", "number", required: true, title: "Set the length of circulation cycle (in minutes)", defaultValue:10
+       input "useinoff", "enum", requirerd: true, title: "Use fan circulation in OFF mode", options: ["True", "False"], defaultValue: "True"
     }
 
 }
@@ -59,6 +61,9 @@ def updated() {
 }
 
 def initialize() {
+
+	state.fanstarted = false
+
 	// TODO: subscribe to attributes, devices, locations, etc.
     
     subscribe(thermostat, "thermostatFanMode", delayControlHandler)    
@@ -85,7 +90,7 @@ def delayControlHandler(evt) {
 //log.debug "TMode ${thermostat.currentthermostatMode}"
 //log.debug "TState ${thermostat.currentthermostatOperatingState}"
  
-	if(fanmode == "fanAuto" && (tmode == "heat" || tmode == "cool" || tmode == "auto") && tstate == "idle")
+	if(fanmode == "fanAuto" && (tmode == "heat" || tmode == "cool" || tmode == "auto" || useinoff == "True") && tstate == "idle")
 	  {
 	  runIn(offdelaytime*60, circHandler)
 	  log.debug "off delay started"
@@ -94,19 +99,28 @@ def delayControlHandler(evt) {
 	  		unschedule(circHandler)
 	        log.debug "off delay cancelled"
 	        }
+    if(tstate != "idle" && state.fanstarted == true)
+      {
+      thermostat.fanAuto()
+      state.fanstarted = false
+      unschedule(doneHandler)
+      log.debug "Fan turned to auto because system is running"
+      }
 }
 
 
 def circHandler() {
 
 	thermostat.fanOn()
+    state.fanstarted = true
     runIn(fanontime *60, doneHandler)
     log.debug "fan turned on"
 }
         
     
 def doneHandler() {
-
+	
+    state.fanstarted = false
 	thermostat.fanAuto()
     log.debug "fan off"
 }
