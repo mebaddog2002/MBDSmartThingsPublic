@@ -1,5 +1,5 @@
 /**
- *  HVAC Humidifier 3
+ *  HVAC Humidifier
  *
  *  Copyright 2018 Michael Goldsberry
  *
