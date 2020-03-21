@@ -43,6 +43,8 @@ preferences {
        input "offdelaytime", "number", required: true, title: "Set time between circulation cycles (in minutes)", defaultValue:30
        input "fanontime", "number", required: true, title: "Set the length of circulation cycle (in minutes)", defaultValue:10
        input "useinoff", "enum", requirerd: true, title: "Use fan circulation in OFF mode", options: ["True", "False"], defaultValue: "True"
+       input "humidifierswitch", "capability.switch", title: "Select Humidifier"
+       input "dehumidifierswitch", "capability.switch", title: "Select Dehumidifier"
     }
 
 }
@@ -63,6 +65,7 @@ def updated() {
 def initialize() {
 
 	state.fanstarted = false
+    state.stopfan = false
 
 	// TODO: subscribe to attributes, devices, locations, etc.
     
@@ -85,12 +88,14 @@ def delayControlHandler(evt) {
     def fanmode = thermostat.currentthermostatFanMode
     def tmode = thermostat.currentthermostatMode
     def tstate = thermostat.currentthermostatOperatingState
+    def humidifier = humidifierswitch.currentSwitch
+    def dehumidifier = dehumidifierswitch.currentSwitch
         
 //log.debug "Tfan ${thermostat.currentthermostatFanMode}"
 //log.debug "TMode ${thermostat.currentthermostatMode}"
 //log.debug "TState ${thermostat.currentthermostatOperatingState}"
  
-	if(fanmode == "fanAuto" && (tmode == "heat" || tmode == "cool" || tmode == "auto" || useinoff == "True") && tstate == "idle")
+	if(fanmode == "auto" && (tmode != "off" || useinoff == "True") && tstate == "idle") // (tmode == "heat" || tmode == "cool" || tmode == "auto" || useinoff == "True") && tstate == "idle")
 	  {
 	  runIn(offdelaytime*60, circHandler)
 	  log.debug "off delay started"
@@ -103,8 +108,26 @@ def delayControlHandler(evt) {
       {
       thermostat.fanAuto()
       state.fanstarted = false
+      state.stopfan = true
+      runIn(300, delayControlHandler)
       unschedule(doneHandler)
       log.debug "Fan turned to auto because system is running"
+      }
+    if(state.stopfan == true && fanmode == "on" && humidifier != "on" && dehumidifier != "on")
+      {
+      thermostat.fanAuto()
+      runIn(300, delayControlHandler)
+      log.debug "fan still on try to turn off again"
+      }
+    if(state.stopfan == true && fanmode == "on" && (humidifier == "on" || dehumidifier == "on"))
+      {
+      state.stopfan = false
+      log.debug "fan on because of humidifier or dehumidifier"
+      }
+    if(state.stopfan == true && fanmode == "auto")
+      {
+      state.stopfan = false
+      log.debug "checked and fan is off"
       }
 }
 

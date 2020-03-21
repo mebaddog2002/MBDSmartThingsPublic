@@ -68,6 +68,7 @@
  *
  *
  *	Version 0.0 Still developing and testing. MG
+ *	Version 0.1 Added hvac humidifier and dehumidifier so fan doesnt slow down in fan only
  *
  *
  */
@@ -103,6 +104,12 @@ preferences {
     	input "heatmin", "enum", title: "Heat Min Speed", options: ["Hi", "MedHi", "MedLow"], required: true, defaultValue:"MedHi"
         input "coolmin", "enum", title: "Cooling Min Speed", options: ["Hi", "MedHi", "MedLow"], required: true, defaultValue:"MedHi"
         input "fanmin", "enum", title: "Fan On Slow Speed", options: ["Hi", "MedHi", "MedLow", "Low"], required: true, defaultValue:"Low"
+        input "dehummin", "enum", title: "Fan speed when HVAC dehumidifier is running", options: ["Hi", "MedHi", "MedLow", "Low"], required: true, defaultValue:"Hi"
+        input "hummin", "enum", title: "Fan speed when HVAC humidifier is running", options: ["Hi", "MedHi", "MedLow", "Low"], required: true, defaultValue:"Hi"
+    }
+    section("HVAC Humidifier and Dehumidifier") {
+    	input "hvachumidifier", "capability.switch", title: "HVAC Humidifier"
+        input "hvacdehumidifier", "capability.switch", title: "HVAC Dehumidifier"
     }
 
 }
@@ -131,6 +138,7 @@ def initialize() {
     atomicState.speedatmin = false
     atomicState.overepressure = false
     atomicState.maxspeed = false
+    atomicState.fanhumidityspeed = false
     
 
 // TODO: subscribe to attributes, devices, locations, etc.
@@ -140,7 +148,9 @@ def initialize() {
     subscribe(thermostat, "thermostatOperatingState", mainControlHandler)
     subscribe(backpressure, "contact", pressureControlHandler)
     subscribe(thermostat, "thermostatFanMode", fanonControlHandler)
-    subscribe(thermostat, "thermostatOperatingState", fanonControlHandler)        
+    subscribe(thermostat, "thermostatOperatingState", fanonControlHandler)   
+    subscribe(hvachumidifier, "switch", fanonControlHandler)
+    subscribe(hvacdehumidifier, "switch", fanonControlHandler)
 
 }
 
@@ -174,7 +184,7 @@ log.debug "HVAC Running ${atomicState.hvacrunning}"
         {
         if(medhirelaystate == "off" && medlowrelaystate == "off" && lowrelaystate == "off")
           {
-          atomicState.heatrunning = true
+          atomicState.hvacrunning = true
           runIn(60, hvacstartspeedgoodHandler)
           log.debug "HVAC start at Hi"
           } else {                 
@@ -185,7 +195,7 @@ log.debug "HVAC Running ${atomicState.hvacrunning}"
         {
         if(medhirelaystate == "on" || (medhirelaystate == "off" && medlowrelaystate == "off" && lowrelaystate == "off"))
           {
-          atomicState.heatrunning = true
+          atomicState.hvacrunning = true
           runIn(60, hvacstartspeedgoodHandler)
           log.debug "HVAC start for MedHi"
           } else {
@@ -196,7 +206,7 @@ log.debug "HVAC Running ${atomicState.hvacrunning}"
         {
         if(medlowrelaystate == "on" || medhirelaystate == "on" || (medhirelaystate == "off" && medlowrelaystate == "off" && lowrelaystate == "off"))
           {
-          atomicState.heatrunning = true
+          atomicState.hvacrunning = true
           runIn(60, hvacstartspeedgoodHandler)
           log.debug "HVAC start for MedLow"
           } else {
@@ -230,14 +240,25 @@ def fanonControlHandler(evt) {
     
     def fanmodefo = thermostat.currentthermostatFanMode
     def tstatefo = thermostat.currentthermostatOperatingState  
+    def humidifier = hvachumidifier.currentSwitch
+    def dehumidifier = hvacdehumidifier.currentSwitch
     
-    if(fanmodefo == "fanAuto")
+    log.debug "humidifier ${humidifier}"
+    log.debug "dehumidifier ${dehumidifier}"
+    
+    
+    if(fanmodefo == "auto")
       {
       atomicState.fanslowspeed = false
       log.debug "Fan only slow speed cancelled"
       }
       
-    if(fanmodefo == "fanAuto" || tstatefo == "heating" || tstatefo == "cooling" || atomicState.hvacrunning == true)
+    if((humidifier == "off" && dehumidifier == "off") || tstatefo == "heating" || tstatefo == "cooling" || atomicState.hvacrunning == true)
+      {
+      atomicState.fanhumidityspeed = false
+      }
+      
+    if(fanmodefo == "auto" || tstatefo == "heating" || tstatefo == "cooling" || atomicState.hvacrunning == true || humidifier == "on" || dehumidifier == "on")
       {
       unschedule(fanslowHandler)
       atomicState.fanatslow = false
@@ -246,7 +267,7 @@ def fanonControlHandler(evt) {
 
 	// Delay after fan mode turned ON before speeding fan to high so vents have time to open
 
-    if(fanmodefo == "fanOn" && (tstatefo == "idle" || tstatefo == "off") && atomicState.hvacrunning == false && atomicState.fanslowspeed == false)
+    if(fanmodefo == "on" && (tstatefo == "idle" || tstatefo == "off") && atomicState.hvacrunning == false && atomicState.fanslowspeed == false && humidifier == "off" && dehumidifier == "off")
       {
   	  runIn(60, fanondelayHandler)
       } 
@@ -255,9 +276,22 @@ def fanonControlHandler(evt) {
            log.debug "Fan only delay cancelled"
            }
            
-	// Fan was running slow before heat/cool started.  Slowing fan back down after heat/cool finishes
+    // Delay after fan mode turned ON and humidifier or dehumidifier ON before setting fan so vents have time to open
     
-    if(fanmodefo == "fanOn" && (tstatefo == "idle" || tstatefo == "off") && atomicState.hvacrunning == false && atomicState.fanslowspeed == true && atomicState.fanatslow == false)
+    if(fanmodefo == "on" && (tstatefo == "idle" || tstatefo == "off") && atomicState.hvacrunning == false && atomicState.fanhumidityspeed == false && (humidifier == "on" || dehumidifier == "on"))
+      {
+   	  runIn(60, fanondelayhumidityHandler)
+      log.debug "Humidity start delay"
+      } 
+      else { 
+           unschedule(fanondelayhumidityHandler)
+           unschedule(fanspeedhumidityHandler)
+           log.debug "Fan only humidity delay cancelled"
+           }
+           
+	// Fan was running slow before heat/cool started.  Slowing fan back down after heat/cool and humidity finishes
+    
+    if(fanmodefo == "on" && (tstatefo == "idle" || tstatefo == "off") && atomicState.hvacrunning == false && atomicState.fanslowspeed == true && atomicState.fanatslow == false && atomicState.fanhumidityspeed == false)
       {
        if(fanmin == "Hi")
          {
@@ -302,6 +336,8 @@ def pressureControlHandler(evt) {
     log.debug "Max Speed ${atomicState.maxspeed}"
     log.debug "HVAC start finished ${atomicState.hvacstartfinished}"
     log.debug "Adjusting Speed ${atomicState.adjustingspeed}"
+    log.debug "Speed min ${atomicState.speedatmin}"
+ 
  
 	if(pressure == "closed")
       {
@@ -311,9 +347,11 @@ def pressureControlHandler(evt) {
              atomicState.overepressure = false
              }
              
-    if(pressure == "open" && fanmodep == "fanAuto" && tstatep == "idle")
+    if(pressure == "open" && fanmodep == "auto" && tstatep == "idle")
       {
       atomicState.maxspeed = false
+      atomicState.adjustingspeed = false
+      atomicState.speedatmin = false
       }
 
 	// Speeding fan up to max usable speed.  When the hvac starts some vents may close do to temp in that room so do not want to go straight to high speed and 
@@ -448,8 +486,58 @@ def hvacstopHandler() {
     atomicState.hvacstartfinished = false
     atomicState.maxspeed = false
     fanonControlHandler()    
+    pressureControlHandler()
     log.debug "HVAC Stopped"
 }
+
+// Setting fan speed to high in fan only when humidifier or dehumidifier is on
+
+def fanondelayhumidityHandler() {
+	medhirelay.off()
+    medlowrelay.off()
+    lowrelay.off()
+    atomicState.fanhumidityspeed = true
+    runIn(60,fanspeedhumidityHandler)
+    log.debug "Fan Only for humidity set to hi for start"
+}
+
+// Setting fan speed when humidifier or dehumidifier is on
+
+def fanspeedhumidityHandler() {
+	log.debug "humidity slowing speed"
+    
+    def humidifier = hvachumidifier.currentSwitch
+    def dehumidifier = hvacdehumidifier.currentSwitch
+       
+    if((humidifier == "on" && hummin == "Hi") || (dehumidifier == "on" && dehummin == "Hi"))
+      {
+      medhirelay.off()
+      medlowrelay.off()
+      lowrelay.off()
+      log.debug "fan set to high for humidity"
+      }
+    if((humidifier == "on" && hummin == "MedHi") || (dehumidifier == "on" && dehummin == "MedHi"))
+      {
+      medhirelay.on()
+   	  medlowrelay.off()
+      lowrelay.off()
+      log.debug "fan set to medhigh for humidity"
+      }
+    if((humidifier == "on" && hummin == "MedLow") || (dehumidifier == "on" && dehummin == "MedLow"))
+      {      
+      medhirelay.off()
+   	  medlowrelay.on()
+      lowrelay.off()
+      log.debug "fan set to medlow for humidity"
+      }
+    if((humidifier == "on" && hummin == "Low") || (dehumidifier == "on" && dehummin == "Low"))
+      {      
+      medhirelay.off()
+   	  medlowrelay.off()
+      lowrelay.on()
+      log.debug "fan set to low for humidity"
+      }
+}      
 
 // Speeding up fan to HI in fan only and starting timer for slow down
 
