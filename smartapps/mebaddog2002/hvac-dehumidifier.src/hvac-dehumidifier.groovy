@@ -17,6 +17,7 @@
  *
  *	Version 0.0 Still developing and testing MG
  *  Version 1.0 Debugging done and running good March 21 2020 MG
+ *  Version 1.1 Allow dehumidifier to turn on when A/C starts March 28 2020 MG
  *
  */
 definition(
@@ -39,6 +40,7 @@ preferences {
        input "hvacfanneeded", "enum", required: true, title: "Use HVAC fan while dehumidifier is on", options: ["True", "False"], defaultValue: "True"
        input "acdelayneeded", "enum", required: true, title: "Stop dehumidifier after A/C shuts off", options: ["True", "False"], defaultValue: "True"
        input "acdelay", "number", required: true, title: "Delay after A/C before dehumidifier can turn back on in minutes", defaultValue:15
+       input "runwithac", "enum", required: true, title: "Start dehumidifier if A/C turns on", options: ["True", "False"], defaultValue: "True"
 	}
     section("Humidity Sensor") {
         input "humiditysensor", "capability.relativeHumidityMeasurement", required: true, title: "Select Humidity Sensor"
@@ -77,6 +79,7 @@ def initialize() {
     subscribe(thermostat, "thermostatFanMode", humidityControlHandler)
     subscribe(thermostat, "thermostatOperatingState", humidityControlHandler)
     subscribe(thermostat, "thermostatMode", humidityControlHandler)
+    subscribe(dehumidifierswitch, "switch", humidityControlHandler)
 }
 
 // TODO: implement event handlers
@@ -106,6 +109,12 @@ log.debug "State ${tstate}"
         atomicState.startedfan = false
         log.debug "fan turned to auto ac on"
         }
+      }
+    
+    if(tstate == "cooling" && dehumidifier == "off" && runwithac == "True" && humidity > dehumidifieroff)
+      {
+      log.debug "dehum on because ac turned on"
+      dehumidifierswitch.on()
       }
       
     if(atomicState.acrunning == true && tstate == "idle" && atomicState.waiting == false)
