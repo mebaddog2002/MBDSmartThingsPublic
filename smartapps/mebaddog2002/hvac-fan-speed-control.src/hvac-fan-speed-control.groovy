@@ -70,6 +70,7 @@
  *	Version 0.0 Still developing and testing. MG
  *	Version 0.1 Added hvac humidifier and dehumidifier so fan doesnt slow down in fan only
  *  Version 1.0 Done testing changed name and removed test versions from github March 21 2020 MG
+ *	Version 1.1 Added tstate "fan only" Aug 21 2020 MG
  *
  *
  */
@@ -223,7 +224,7 @@ log.debug "HVAC Running ${atomicState.hvacrunning}"
       
 	// delay after heat or cooling stops  
 
-    if((tstate == "idle" || tstate == "off") && atomicState.hvacrunning == true)
+    if((tstate == "idle" || tstate == "off" || tstate == "fan only") && atomicState.hvacrunning == true)
       {
       runIn(120, hvacstopHandler)
       log.debug "HVAC Stop timer started"
@@ -268,7 +269,7 @@ def fanonControlHandler(evt) {
 
 	// Delay after fan mode turned ON before speeding fan to high so vents have time to open
 
-    if(fanmodefo == "on" && (tstatefo == "idle" || tstatefo == "off") && atomicState.hvacrunning == false && atomicState.fanslowspeed == false && humidifier == "off" && dehumidifier == "off")
+    if(fanmodefo == "on" && (tstatefo == "idle" || tstatefo == "off" || tstatefo == "fan only") && atomicState.hvacrunning == false && atomicState.fanslowspeed == false && humidifier == "off" && dehumidifier == "off")
       {
   	  runIn(60, fanondelayHandler)
       } 
@@ -279,7 +280,7 @@ def fanonControlHandler(evt) {
            
     // Delay after fan mode turned ON and humidifier or dehumidifier ON before setting fan so vents have time to open
     
-    if(fanmodefo == "on" && (tstatefo == "idle" || tstatefo == "off") && atomicState.hvacrunning == false && atomicState.fanhumidityspeed == false && (humidifier == "on" || dehumidifier == "on"))
+    if(fanmodefo == "on" && (tstatefo == "idle" || tstatefo == "off" || tstatefo == "fan only") && atomicState.hvacrunning == false && atomicState.fanhumidityspeed == false && (humidifier == "on" || dehumidifier == "on"))
       {
    	  runIn(60, fanondelayhumidityHandler)
       log.debug "Humidity start delay"
@@ -292,7 +293,7 @@ def fanonControlHandler(evt) {
            
 	// Fan was running slow before heat/cool started.  Slowing fan back down after heat/cool and humidity finishes
     
-    if(fanmodefo == "on" && (tstatefo == "idle" || tstatefo == "off") && atomicState.hvacrunning == false && atomicState.fanslowspeed == true && atomicState.fanatslow == false && atomicState.fanhumidityspeed == false)
+    if(fanmodefo == "on" && (tstatefo == "idle" || tstatefo == "off" || tstatefo == "fan only") && atomicState.hvacrunning == false && atomicState.fanslowspeed == true && atomicState.fanatslow == false && atomicState.fanhumidityspeed == false)
       {
        if(fanmin == "Hi")
          {
