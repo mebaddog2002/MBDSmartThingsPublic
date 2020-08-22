@@ -18,6 +18,8 @@
  *	Version 0.0 Still developing and testing MG
  *  Version 1.0 Debugging done and running good March 21 2020 MG
  *  Version 1.1 Allow dehumidifier to turn on when A/C starts March 28 2020 MG
+ *  Version 1.2 Bug fix July 28 2020 MG
+ *	Version 1.3 Bug fix for fan only mode Aug 21 2020 MG
  *
  */
 definition(
@@ -98,10 +100,14 @@ log.debug "Dehumidifier ${dehumidifier}"
 log.debug "fan mode ${fanmode}"
 log.debug "Mode ${tmode}"
 log.debug "State ${tstate}"
+log.debug "started fan ${atomicState.startedfan}"
+log.debug "acrunning ${atomicState.acrunning}"
+log.debug "waiting ${atomicState.waiting}"
 
 	if(tstate == "cooling" && dehumidifier == "on" && acdelayneeded == "True")
       {
       atomicState.acrunning = true
+      atomicState.waiting = false
       log.debug "ac on"
       if(atomicState.startedfan == true)
         {
@@ -115,9 +121,10 @@ log.debug "State ${tstate}"
       {
       log.debug "dehum on because ac turned on"
       dehumidifierswitch.on()
+      atomicState.waiting = false
       }
       
-    if(atomicState.acrunning == true && tstate == "idle" && atomicState.waiting == false)
+    if(atomicState.acrunning == true && (tstate == "idle" || tstate == "fan only") && atomicState.waiting == false)
       {
       atomicState.waiting = true
       dehumidifierswitch.off()
@@ -172,6 +179,9 @@ log.debug "State ${tstate}"
                log.debug "fan turned to auto not in cool mode"
                }  
              }  
+log.debug "started fan ${atomicState.startedfan}"
+log.debug "acrunning ${atomicState.acrunning}"
+log.debug "waiting ${atomicState.waiting}"
 }
     
 
