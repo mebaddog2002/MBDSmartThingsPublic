@@ -21,6 +21,8 @@
  
  // Version 1.0 Feb 23 2019 mg
  // Version 2.0 Updated so it can be used in off mode.  Feb 28 2019 MG
+ // Version 2.1 Bug fix for "fan only" mode Aug 30 2020 MG
+ // Version 2.2 Bug fix so it will verify fan turned off Aug 30 2020 MG
  
 definition(
     name: "HVAC Fan Circulation",
@@ -95,7 +97,7 @@ def delayControlHandler(evt) {
 //log.debug "TMode ${thermostat.currentthermostatMode}"
 //log.debug "TState ${thermostat.currentthermostatOperatingState}"
  
-	if(fanmode == "auto" && (tmode != "off" || useinoff == "True") && tstate == "idle") // (tmode == "heat" || tmode == "cool" || tmode == "auto" || useinoff == "True") && tstate == "idle")
+	if(fanmode == "auto" && (tmode != "off" || useinoff == "True") && tstate == "idle")
 	  {
 	  runIn(offdelaytime*60, circHandler)
 	  log.debug "off delay started"
@@ -104,7 +106,7 @@ def delayControlHandler(evt) {
 	  		unschedule(circHandler)
 	        log.debug "off delay cancelled"
 	        }
-    if(tstate != "idle" && state.fanstarted == true)
+    if((tstate != "idle" || tstate != "fan only") && state.fanstarted == true)
       {
       thermostat.fanAuto()
       state.fanstarted = false
@@ -144,7 +146,9 @@ def circHandler() {
 def doneHandler() {
 	
     state.fanstarted = false
+    state.stopfan = true
 	thermostat.fanAuto()
+    runIn(300, delayControlHandler)
     log.debug "fan off"
 }
 	
