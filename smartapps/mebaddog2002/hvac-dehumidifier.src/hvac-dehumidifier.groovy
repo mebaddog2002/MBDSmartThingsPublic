@@ -158,7 +158,7 @@ log.debug "waiting ${atomicState.waiting}"
         if(atomicState.startedfan == true)
           {
           thermostat.fanAuto()
-          atomicState.startedfan == false
+          atomicState.startedfan = false
           log.debug "turned fan off"
           }
         }

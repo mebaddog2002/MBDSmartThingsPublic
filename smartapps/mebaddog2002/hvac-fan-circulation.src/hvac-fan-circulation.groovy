@@ -61,13 +61,15 @@ def updated() {
 	log.debug "Updated with settings: ${settings}"
 
 	unsubscribe()
+    unschedule()
 	initialize()
 }
 
 def initialize() {
 
-	state.fanstarted = false
-    state.stopfan = false
+	atomicState.fanstarted = false
+    atomicState.stopfan = false
+    atomicState.offdelaystarted = false
 
 	// TODO: subscribe to attributes, devices, locations, etc.
     
@@ -75,10 +77,8 @@ def initialize() {
     subscribe(thermostat, "thermostatOperatingState", delayControlHandler)
     subscribe(thermostat, "thermostatMode", delayControlHandler)
 
-  	runIn(offdelaytime*60, circHandler)
-  	log.debug "off delay started"	
+  	delayControlHandler()
 
-	log.debug "initialized"
 }
 
 
@@ -93,62 +93,74 @@ def delayControlHandler(evt) {
     def humidifier = humidifierswitch.currentSwitch
     def dehumidifier = dehumidifierswitch.currentSwitch
         
-//log.debug "Tfan ${thermostat.currentthermostatFanMode}"
-//log.debug "TMode ${thermostat.currentthermostatMode}"
-//log.debug "TState ${thermostat.currentthermostatOperatingState}"
+log.debug "Tfan ${thermostat.currentthermostatFanMode}"
+log.debug "TMode ${thermostat.currentthermostatMode}"
+log.debug "TState ${thermostat.currentthermostatOperatingState}"
+log.debug "fanstarted ${atomicState.fanstarted}"
+log.debug "stopfan ${atomicState.stopfan}"
  
 	if(fanmode == "auto" && (tmode != "off" || useinoff == "True") && tstate == "idle")
 	  {
-	  runIn(offdelaytime*60, circHandler)
-	  log.debug "off delay started"
+      if(atomicState.offdelaystarted == false)
+	  	{
+        runIn(offdelaytime*60, circHandler)
+        atomicState.offdelaystarted = true
+	  	log.debug "off delay started"
+        }
 	  }
 	  else {
 	  		unschedule(circHandler)
+            atomicState.offdelaystarted = false
 	        log.debug "off delay cancelled"
 	        }
-    if((tstate != "idle" || tstate != "fan only") && state.fanstarted == true)
+    if((tstate != "idle" && tstate != "fan only") && atomicState.fanstarted == true)
       {
       thermostat.fanAuto()
-      state.fanstarted = false
-      state.stopfan = true
-      runIn(300, delayControlHandler)
+      atomicState.fanstarted = false
+//      atomicState.stopfan = true
+//      runIn(60, delayControlHandler)
       unschedule(doneHandler)
       log.debug "Fan turned to auto because system is running"
       }
-    if(state.stopfan == true && fanmode == "on" && humidifier != "on" && dehumidifier != "on")
+/*    if(atomicState.stopfan == true && fanmode == "on" && humidifier != "on" && dehumidifier != "on")
       {
       thermostat.fanAuto()
-      runIn(300, delayControlHandler)
+      runIn(60, delayControlHandler)
       log.debug "fan still on try to turn off again"
       }
-    if(state.stopfan == true && fanmode == "on" && (humidifier == "on" || dehumidifier == "on"))
+    if(atomicState.stopfan == true && fanmode == "on" && (humidifier == "on" || dehumidifier == "on"))
       {
-      state.stopfan = false
+      atomicState.stopfan = false
       log.debug "fan on because of humidifier or dehumidifier"
       }
-    if(state.stopfan == true && fanmode == "auto")
+    if(atomicState.stopfan == true && fanmode == "auto")
       {
-      state.stopfan = false
+      atomicState.stopfan = false
       log.debug "checked and fan is off"
       }
+*/      
+log.debug "fanstarted ${atomicState.fanstarted}"
+log.debug "stopfan ${atomicState.stopfan}"
+
 }
 
 
 def circHandler() {
 
 	thermostat.fanOn()
-    state.fanstarted = true
-    runIn(fanontime *60, doneHandler)
+    atomicState.fanstarted = true
+    runIn(fanontime*60, doneHandler)
     log.debug "fan turned on"
 }
         
     
 def doneHandler() {
 	
-    state.fanstarted = false
-    state.stopfan = true
+    atomicState.fanstarted = false
+//    atomicState.stopfan = true
 	thermostat.fanAuto()
-    runIn(300, delayControlHandler)
     log.debug "fan off"
+//    runIn(60, delayControlHandler)
+    
 }
 	
