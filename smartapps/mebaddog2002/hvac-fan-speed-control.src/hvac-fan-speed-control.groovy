@@ -339,6 +339,7 @@ def pressureControlHandler(evt) {
     log.debug "HVAC start finished ${atomicState.hvacstartfinished}"
     log.debug "Adjusting Speed ${atomicState.adjustingspeed}"
     log.debug "Speed min ${atomicState.speedatmin}"
+    log.debug "HVAC running ${atomicState.hvacrunning}"
  
  
 	if(pressure == "closed")
@@ -349,12 +350,15 @@ def pressureControlHandler(evt) {
              atomicState.overepressure = false
              }
              
-    if(pressure == "open" && fanmodep == "auto" && tstatep == "idle")
+    if(atomicState.hvacrunning == false)
       {
       atomicState.maxspeed = false
       atomicState.adjustingspeed = false
       atomicState.speedatmin = false
-      }
+      log.debug "turned everything to false because hvac stopped running"
+      }	else {
+      		  log.debug "hvac off code did not run"
+              }
 
 	// Speeding fan up to max usable speed.  When the hvac starts some vents may close do to temp in that room so do not want to go straight to high speed and 
     //		extremely over pressurize system
@@ -412,8 +416,12 @@ def pressureControlHandler(evt) {
                  log.debug "Fan slowed to min MedHi because of pressure"
                  }
         }
-      if((heatmin == "MedLow" && tstatep == "heating") || (coolmin == "MedLow" && tsatep == "cooling"))
+log.debug "made it to medlow ?"
+log.debug "coolmin ${coolmin}"
+log.debug "tstatep ${tstatep}"
+      if((heatmin == "MedLow" && tstatep == "heating") || (coolmin == "MedLow" && tstatep == "cooling"))
         {
+log.debug "coolmin = medlow"
         if(medlowrelaystatep == "on")
           {
           atomicState.speedatmin = true
